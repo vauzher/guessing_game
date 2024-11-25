@@ -24,6 +24,16 @@ def initialize_game_modes():
         st.session_state.current_answer = ""
     if "game_history" not in st.session_state:
         st.session_state.game_history = []
+    if "new_game_clicked" not in st.session_state:
+        st.session_state.new_game_clicked = False
+    if "game_won" not in st.session_state:
+        st.session_state.game_won = False
+
+def reset_game():
+    st.session_state.game_history = []
+    st.session_state.current_answer = get_answer_for_mode(st.session_state.game_mode)
+    st.session_state.new_game_clicked = False
+    st.session_state.game_won = False
 
 def get_answer_for_mode(mode):
     answers = {
@@ -63,7 +73,6 @@ def initialize_stats():
         }
 
 def update_stats(mode, num_guesses, won=False):
-    # Initialize stats if they don't exist
     initialize_stats()
     
     stats = st.session_state.game_stats
@@ -72,47 +81,44 @@ def update_stats(mode, num_guesses, won=False):
     if won:
         stats["correct_guesses"] += 1
     
-    # Update mode-specific stats
     mode_stats = stats["mode_stats"][mode]
     mode_stats["played"] += 1
     if won:
         mode_stats["wins"] += 1
     
-    # Calculate average guesses for the mode
     total_mode_guesses = mode_stats.get("total_guesses", 0) + num_guesses
     mode_stats["total_guesses"] = total_mode_guesses
     mode_stats["avg_guesses"] = total_mode_guesses / max(1, mode_stats["played"])
     
-    # Add to history with timestamp
     stats["history"].append({
         "date": datetime.now().strftime("%Y-%m-%d %H:%M"),
         "mode": mode,
         "guesses": num_guesses,
         "won": won
     })
-    
-    # Debug print (optional - remove in production)
-    print(f"Updated stats: Games played: {stats['games_played']}, Correct: {stats['correct_guesses']}")
 
 def play_page():
     st.markdown("<h1 style='text-align: center;'>Guessing Game</h1>", unsafe_allow_html=True)
     
-    # Initialize game states and stats
     initialize_game_modes()
-    initialize_stats()  # Make sure stats are initialized
+    initialize_stats()
     
-    # Game mode selector in sidebar
+    if st.session_state.new_game_clicked:
+        st.session_state.new_game_clicked = False
+        st.session_state.game_history = []
+        st.session_state.current_answer = get_answer_for_mode(st.session_state.game_mode)
+        st.rerun()
+    
     new_mode = st.sidebar.selectbox(
         "Select Game Mode",
         ["fruits", "animals", "countries"],
         index=["fruits", "animals", "countries"].index(st.session_state.game_mode)
     )
     
-    # Reset game if mode changes
-    if new_mode != st.session_state.game_mode:
+    # Reset game if mode changes OR if new game button is clicked
+    if st.session_state.new_game_clicked or new_mode != st.session_state.game_mode:
         st.session_state.game_mode = new_mode
-        st.session_state.game_history = []
-        st.session_state.current_answer = get_answer_for_mode(new_mode)
+        reset_game()
         st.rerun()
     
     # Initialize answer if not set
@@ -139,7 +145,6 @@ def play_page():
         Type your guess below and I'll let you know if you're getting closer!
         """)
         
-        # Get initial hint from OpenAI
         try:
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -161,39 +166,54 @@ def play_page():
             st.write(chat["bot"])
     
     # User input
-    user_input = st.chat_input("Type your guess here...")
+    if not st.session_state.game_won:  # Only show input if game is not won
+        user_input = st.chat_input("Type your guess here...")
     
+    # Handle win state display
+    if st.session_state.game_won:
+        st.success(f"🎉 Congratulations! You correctly guessed '{st.session_state.current_answer}'!")
+        col1, col2, col3 = st.columns([1,1,1])
+        with col2:
+            if st.button("Start New Game", use_container_width=True):
+                reset_game()
+                st.rerun()
+        return
+
     if user_input:
-        try:
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": f"You are running a guessing game where the answer is '{st.session_state.current_answer}'. Evaluate the user's guess and respond with whether they are correct or not. If they're wrong, provide a new hint that helps them get closer without making it too obvious."},
-                    {"role": "user", "content": user_input}
-                ]
+        if user_input.lower() == st.session_state.current_answer.lower():
+            num_guesses = len([msg for msg in st.session_state.game_history 
+                             if msg["user"] != "Game Start"]) + 1
+            update_stats(
+                mode=st.session_state.game_mode,
+                num_guesses=num_guesses,
+                won=True
             )
-            evaluation = response.choices[0].message.content
-            st.session_state.game_history.append({"user": user_input, "bot": evaluation})
             
-            # Check if user guessed correctly and update stats
-            if user_input.lower() == st.session_state.current_answer.lower():
-                # Update stats before resetting the game
-                num_guesses = len([msg for msg in st.session_state.game_history 
-                                 if msg["user"] != "Game Start"])
-                update_stats(
-                    mode=st.session_state.game_mode,
-                    num_guesses=num_guesses,
-                    won=True
-                )
-                
-                st.balloons()
-                # Reset for next game
-                st.session_state.current_answer = get_answer_for_mode(st.session_state.game_mode)
-                st.session_state.game_history = []
+            st.session_state.game_history.append({
+                "user": user_input, 
+                "bot": f"🎉 Congratulations! You correctly guessed '{st.session_state.current_answer}'!"
+            })
             
+            st.session_state.game_won = True
+            st.balloons()
             st.rerun()
-        except Exception as e:
-            st.error(f"Error communicating with OpenAI: {str(e)}")
+        else:
+            # Only make API call for incorrect guesses
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": f"You are running a guessing game where the answer is '{st.session_state.current_answer}'. Evaluate the user's guess and respond with whether they are correct or not. If they're wrong, provide a new hint that helps them get closer without making it too obvious."},
+                        {"role": "user", "content": user_input}
+                    ]
+                )
+                evaluation = response.choices[0].message.content
+                st.session_state.game_history.append({"user": user_input, "bot": evaluation})
+                st.rerun()
+            except Exception as e:
+                st.error(f"Error communicating with OpenAI: {str(e)}")
+
+# [Rest of the code (stats_page and main) remains unchanged]
 
 def stats_page():
     st.markdown("<h1 style='text-align: center;'>Game Statistics</h1>", unsafe_allow_html=True)
