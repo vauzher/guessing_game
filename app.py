@@ -28,12 +28,20 @@ def initialize_game_modes():
         st.session_state.new_game_clicked = False
     if "game_won" not in st.session_state:
         st.session_state.game_won = False
+    if "hints_remaining" not in st.session_state:
+        st.session_state.hints_remaining = {
+            "fruits": 3,
+            "animals": 3,
+            "countries": 3
+        }
 
 def reset_game():
     st.session_state.game_history = []
     st.session_state.current_answer = get_answer_for_mode(st.session_state.game_mode)
     st.session_state.new_game_clicked = False
     st.session_state.game_won = False
+    # Reset hints for the current mode only
+    st.session_state.hints_remaining[st.session_state.game_mode] = 3
 
 def get_answer_for_mode(mode):
     answers = {
@@ -141,6 +149,7 @@ def play_page():
         Rules:
         - {hints[st.session_state.game_mode]}
         - Try to guess what it is!
+        - You have 3 hints available!
         
         Type your guess below and I'll let you know if you're getting closer!
         """)
@@ -198,20 +207,30 @@ def play_page():
             st.balloons()
             st.rerun()
         else:
-            # Only make API call for incorrect guesses
+            # Modified to only tell if the guess is wrong, no additional hints
+            st.session_state.game_history.append({
+                "user": user_input, 
+                "bot": "Sorry, that's not correct. Try again or use a hint!"
+            })
+            st.rerun()
+
+    # Modify the hint button section
+    current_hints = st.session_state.hints_remaining[st.session_state.game_mode]
+    if current_hints > 0 and not st.session_state.game_won:
+        if st.button(f"Get Hint ({current_hints} remaining)"):
             try:
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
-                        {"role": "system", "content": f"You are running a guessing game where the answer is '{st.session_state.current_answer}'. Evaluate the user's guess and respond with whether they are correct or not. If they're wrong, provide a new hint that helps them get closer without making it too obvious."},
-                        {"role": "user", "content": user_input}
+                        {"role": "system", "content": f"The answer is '{st.session_state.current_answer}'. Provide a helpful hint without giving away the answer directly."},
+                        {"role": "user", "content": "Give me a hint!"}
                     ]
                 )
-                evaluation = response.choices[0].message.content
-                st.session_state.game_history.append({"user": user_input, "bot": evaluation})
+                st.session_state.hints_remaining[st.session_state.game_mode] -= 1
+                st.session_state.game_history.append({"user": "Hint requested", "bot": response.choices[0].message.content})
                 st.rerun()
             except Exception as e:
-                st.error(f"Error communicating with OpenAI: {str(e)}")
+                st.error(f"Error getting hint: {str(e)}")
 
 # [Rest of the code (stats_page and main) remains unchanged]
 
