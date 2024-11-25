@@ -29,7 +29,7 @@ st.set_page_config(page_title="Guessing Game", layout="wide")
 # pages
 def play_page():
     st.markdown('<div class="main">', unsafe_allow_html=True)
-    st.markdown('<div class="title">Guessing Game</div>', unsafe_allow_html=True)
+    st.markdown('<h1 style="text-align: center;">Guessing Game</h1>', unsafe_allow_html=True)
     
     # Initialize game state
     if "game_history" not in st.session_state:
@@ -46,22 +46,28 @@ def play_page():
             # Evaluate the guess
             correct_answer = "apple"
             if user_guess.lower() == correct_answer.lower():
-                evaluation = "Yes, that's the correct answer!"
+                evaluation = "✅ Yes, that's the correct answer!"
             else:
-                evaluation = "No, that's not the correct answer. Try again."
+                evaluation = "❌ No, that's not the correct answer. Try again."
             
             # Add the guess and evaluation to the game history
             st.session_state.game_history.append({"guess": user_guess, "evaluation": evaluation})
             
             # Display the guess and evaluation
-            st.write(f"You guessed: {user_guess}")
-            st.write(f"Evaluation: {evaluation}")
+            st.success(f"You guessed: {user_guess}")
+            st.info(f"Evaluation: {evaluation}")
     
     # Display the chat history
-    st.markdown('<div class="history">', unsafe_allow_html=True)
+    st.markdown('<h2 style="text-align: center;">Chat History</h2>', unsafe_allow_html=True)
     for i, entry in enumerate(st.session_state.game_history):
-        st.markdown(f'<div class="history-item">{i+1}. Guess: {entry["guess"]}, Evaluation: {entry["evaluation"]}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown(
+            f'<div style="border: 1px solid #ccc; border-radius: 5px; padding: 10px; margin: 5px; background-color: #f9f9f9;">'
+            f'<strong>Guess {i+1}:</strong> {entry["guess"]}<br>'
+            f'<strong>Evaluation:</strong> {entry["evaluation"]}'
+            f'</div>',
+            unsafe_allow_html=True
+        )
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
 def stats_page():
