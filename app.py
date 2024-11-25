@@ -250,30 +250,76 @@ def stats_page():
         })
     
     df_modes = pd.DataFrame(mode_data)
-    fig_modes = go.Figure(data=[
-        go.Bar(name="Games Played", x=df_modes["Mode"], y=df_modes["Games Played"]),
-        go.Bar(name="Win Rate %", x=df_modes["Mode"], y=df_modes["Win Rate"])
-    ])
-    fig_modes.update_layout(barmode='group', title="Mode Statistics")
-    st.plotly_chart(fig_modes)
     
-    # Recent Games History
+    # Separate graphs for Games Played and Win Rate
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        fig_games = px.bar(df_modes, 
+                          x="Mode", 
+                          y="Games Played",
+                          title="Games Played by Mode",
+                          color="Mode")
+        fig_games.update_layout(
+            yaxis_title="Number of Games",
+            showlegend=False
+        )
+        st.plotly_chart(fig_games, use_container_width=True)
+    
+    with col2:
+        fig_winrate = px.bar(df_modes, 
+                            x="Mode", 
+                            y="Win Rate",
+                            title="Win Rate by Mode",
+                            color="Mode")
+        fig_winrate.update_layout(
+            yaxis_title="Win Rate (%)",
+            yaxis=dict(range=[0, 100]),  # Fix y-axis range from 0 to 100%
+            showlegend=False
+        )
+        st.plotly_chart(fig_winrate, use_container_width=True)
+    
+    # Average Guesses Chart
+    fig_avg_guesses = px.bar(df_modes,
+                            x="Mode",
+                            y="Avg Guesses",
+                            title="Average Guesses by Mode",
+                            color="Mode")
+    fig_avg_guesses.update_layout(
+        yaxis_title="Average Number of Guesses",
+        showlegend=False
+    )
+    st.plotly_chart(fig_avg_guesses)
+    
+    # Recent Games History with improved visualization
     st.subheader("📜 Recent Games History")
     if stats["history"]:
         df_history = pd.DataFrame(stats["history"][-10:])  # Last 10 games
+        
+        # Add game number column
+        df_history['game_number'] = range(1, len(df_history) + 1)
+        
         fig_history = px.line(df_history, 
-                            x="date", 
+                            x="game_number", 
                             y="guesses",
                             color="mode",
                             markers=True,
-                            title="Number of Guesses Over Time")
+                            title="Number of Guesses in Last 10 Games")
+        fig_history.update_layout(
+            xaxis_title="Game Number",
+            yaxis_title="Number of Guesses",
+            yaxis=dict(rangemode='tozero'),  # Start y-axis from 0
+        )
         st.plotly_chart(fig_history)
         
-        # Recent games table
+        # Recent games table with better formatting
+        st.subheader("Recent Games Details")
+        formatted_df = df_history[['date', 'mode', 'guesses', 'won']].copy()
+        formatted_df.columns = ['Date', 'Mode', 'Guesses', 'Won']
         st.dataframe(
-            df_history.style.apply(lambda x: ['background-color: #90EE90' if v else '' 
-                                            for v in x == True], 
-                                 subset=['won'])
+            formatted_df.style.apply(lambda x: ['background-color: #90EE90' if v else 'background-color: #FFB6C6' 
+                                              for v in x == True], 
+                                   subset=['Won'])
         )
     else:
         st.info("No games played yet!")
