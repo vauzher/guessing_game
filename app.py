@@ -11,7 +11,7 @@ from datetime import datetime
 # Load environment variables
 load_dotenv()
 
-# Configure OpenAI with explicit API key
+#OpenAI Configuration
 api_key = os.getenv("OPENAI_API_KEY")
 client = openai.OpenAI(api_key=api_key)
 
