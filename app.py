@@ -1,9 +1,22 @@
 import streamlit as st
-# import pandas as pd
+from dotenv import load_dotenv
+import os
+import openai
 import numpy as np
 import matplotlib.pyplot as plt
 
-# Set page configuration
+# Load environment variables
+load_dotenv()
+
+# Configure OpenAI
+openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# Verify the API key is loaded
+if not openai.api_key:
+    st.error("OpenAI API key not found. Please check your .env file.")
+    st.stop()
+
+# Set page conf.
 st.set_page_config(page_title="Guessing Game", layout="wide")
 
 # Load CSS from a file
@@ -13,7 +26,7 @@ st.set_page_config(page_title="Guessing Game", layout="wide")
 
 # load_css("styles.css")
 
-# App pages
+# pages
 def play_page():
     st.markdown('<div class="main">', unsafe_allow_html=True)
     st.markdown('<div class="title">Guessing Game</div>', unsafe_allow_html=True)
